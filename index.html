@@ -3,177 +3,219 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
-  <title>Grok Sensor Dashboard</title>
+  <title>Grok Sensor Dashboard • Charts</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body {
-      margin: 0; padding: 20px; width: 600px; height: 600px;
+      margin: 0; padding: 15px; width: 600px; height: 600px;
       background: rgba(0,0,0,0.9); color: #0ff; font-family: system-ui, sans-serif;
       overflow: hidden; box-sizing: border-box;
     }
-    h1 { font-size: 28px; margin: 0 0 15px 0; text-align: center; text-shadow: 0 0 8px #0ff; }
+    h1 { font-size: 26px; margin: 0 0 12px 0; text-align: center; text-shadow: 0 0 8px #0ff; }
     .grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     }
     .panel {
-      background: rgba(0, 255, 255, 0.1); border: 2px solid #0ff;
-      border-radius: 12px; padding: 15px; font-size: 18px;
+      background: rgba(0, 255, 255, 0.08); border: 2px solid #0ff;
+      border-radius: 12px; padding: 12px;
     }
-    .value { font-size: 22px; font-weight: bold; color: #0f0; margin: 4px 0; }
-    .label { font-size: 14px; opacity: 0.8; }
+    canvas { width: 100% !important; height: 140px !important; }
+    .value { font-size: 18px; font-weight: bold; color: #0f0; margin: 6px 0 4px; text-align: center; }
+    .label { font-size: 13px; opacity: 0.8; text-align: center; }
     button, .focusable {
-      padding: 14px 24px; margin: 8px 0; font-size: 18px; width: 100%;
+      padding: 12px; margin: 6px 0; font-size: 17px; width: 100%;
       background: #0ff; color: #000; border: none; border-radius: 10px;
       font-weight: bold; cursor: pointer;
     }
-    button:active, .focusable:focus {
-      background: #0cc; transform: scale(1.03);
-    }
+    button:active, .focusable:focus { background: #0cc; transform: scale(1.03); }
     #log {
-      margin-top: 15px; height: 120px; overflow-y: auto;
-      background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px;
-      font-size: 15px; white-space: pre-wrap;
+      margin-top: 10px; height: 80px; overflow-y: auto;
+      background: rgba(0,0,0,0.6); padding: 8px; border-radius: 8px;
+      font-size: 14px; white-space: pre-wrap; line-height: 1.3;
     }
-    .status { text-align: center; font-size: 16px; margin: 10px 0; }
+    .status { text-align: center; font-size: 15px; margin: 8px 0; color: #0f0; }
   </style>
 </head>
 <body>
-  <h1>👓 Grok Sensor Dashboard</h1>
+  <h1>👓 Grok Sensor Live Charts</h1>
   
   <div class="grid">
-    <!-- Accelerometer -->
+    <!-- Accelerometer Chart -->
     <div class="panel">
       <div class="label">Accelerometer (m/s²)</div>
-      <div class="value" id="accel">X: 0.00 | Y: 0.00 | Z: 0.00</div>
+      <canvas id="accelChart"></canvas>
+      <div class="value" id="accelValue">X:0 Y:0 Z:0</div>
     </div>
 
-    <!-- Gyroscope -->
+    <!-- Gyroscope Chart -->
     <div class="panel">
       <div class="label">Gyroscope (°/s)</div>
-      <div class="value" id="gyro">X: 0.00 | Y: 0.00 | Z: 0.00</div>
+      <canvas id="gyroChart"></canvas>
+      <div class="value" id="gyroValue">X:0 Y:0 Z:0</div>
     </div>
 
-    <!-- Orientation -->
+    <!-- Orientation Chart -->
     <div class="panel">
-      <div class="label">Orientation (Tilt / Heading)</div>
-      <div class="value" id="orient">α: 0° | β: 0° | γ: 0°</div>
+      <div class="label">Orientation (°)</div>
+      <canvas id="orientChart"></canvas>
+      <div class="value" id="orientValue">α:0 β:0 γ:0</div>
     </div>
 
-    <!-- Geolocation -->
+    <!-- Location -->
     <div class="panel">
       <div class="label">Location (from phone)</div>
-      <div class="value" id="geo">Lat: — | Lon: —</div>
-      <button onclick="getLocation()" class="focusable">📍 Get Location</button>
+      <div class="value" id="geo" style="font-size:19px;">Lat: — | Lon: —</div>
+      <button onclick="getLocation()" class="focusable">📍 Refresh Location</button>
     </div>
   </div>
 
   <div class="panel" style="grid-column: 1 / -1;">
-    <div class="label">Input Events (Neural Band / D-pad)</div>
-    <div id="input-log" style="font-size:18px; min-height:40px;">Waiting for input...</div>
+    <div class="label">Last Input • Status</div>
+    <div id="input-log" style="font-size:17px; min-height:36px;">Waiting for Neural Band / D-pad...</div>
   </div>
 
-  <div class="status" id="status">Ready — Grant sensor permissions when prompted</div>
-  <button onclick="requestPermissions()" class="focusable">Enable All Sensors</button>
+  <div class="status" id="status">Auto-initializing sensors...</div>
+  <button onclick="requestPermissions()" class="focusable">🔄 Retry Sensors</button>
 
-  <div id="log">Event log will appear here...</div>
+  <div id="log">Live log...</div>
 
   <script>
-    let accelEl = document.getElementById('accel');
-    let gyroEl = document.getElementById('gyro');
-    let orientEl = document.getElementById('orient');
-    let geoEl = document.getElementById('geo');
-    let statusEl = document.getElementById('status');
-    let logEl = document.getElementById('log');
-    let inputLogEl = document.getElementById('input-log');
+    // Chart.js instances
+    let accelChart, gyroChart, orientChart;
+    let accelData = { x: [], y: [], z: [] };
+    let gyroData = { x: [], y: [], z: [] };
+    let orientData = { alpha: [], beta: [], gamma: [] };
+    const MAX_POINTS = 40;
 
-    function log(msg) {
-      const time = new Date().toLocaleTimeString('en-US', {hour12:false, minute:'2-digit', second:'2-digit'});
-      logEl.textContent = `[${time}] ${msg}\n` + logEl.textContent;
-      if (logEl.textContent.split('\n').length > 12) logEl.textContent = logEl.textContent.split('\n').slice(0,12).join('\n');
+    const colors = {
+      x: '#0f0', y: '#0ff', z: '#f0f',
+      alpha: '#0f0', beta: '#0ff', gamma: '#f0f'
+    };
+
+    function createChart(canvasId, title) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      return new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 0 },
+          scales: {
+            y: { grid: { color: '#0ff22' }, ticks: { color: '#0ff', font: { size: 11 } } },
+            x: { display: false }
+          },
+          plugins: { legend: { display: true, labels: { color: '#0ff', font: { size: 11 }, boxWidth: 8 } } }
+        }
+      });
     }
 
-    // Device Motion (Accelerometer + Gyro)
+    function initCharts() {
+      accelChart = createChart('accelChart');
+      accelChart.data.datasets = [
+        { label: 'X', borderColor: colors.x, data: [], tension: 0.3 },
+        { label: 'Y', borderColor: colors.y, data: [], tension: 0.3 },
+        { label: 'Z', borderColor: colors.z, data: [], tension: 0.3 }
+      ];
+
+      gyroChart = createChart('gyroChart');
+      gyroChart.data.datasets = [
+        { label: 'X', borderColor: colors.x, data: [], tension: 0.3 },
+        { label: 'Y', borderColor: colors.y, data: [], tension: 0.3 },
+        { label: 'Z', borderColor: colors.z, data: [], tension: 0.3 }
+      ];
+
+      orientChart = createChart('orientChart');
+      orientChart.data.datasets = [
+        { label: 'α', borderColor: colors.alpha, data: [], tension: 0.3 },
+        { label: 'β', borderColor: colors.beta, data: [], tension: 0.3 },
+        { label: 'γ', borderColor: colors.gamma, data: [], tension: 0.3 }
+      ];
+    }
+
+    function addData(chart, newDataArray, value) {
+      chart.data.labels.push('');
+      if (chart.data.labels.length > MAX_POINTS) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach((ds, i) => ds.data.shift());
+      }
+      chart.data.datasets.forEach((ds, i) => ds.data.push(newDataArray[i]));
+      chart.update('none');
+    }
+
     function handleMotion(event) {
       const a = event.accelerationIncludingGravity || event.acceleration;
       if (a) {
-        accelEl.textContent = `X: ${a.x?.toFixed(2) || 0} | Y: ${a.y?.toFixed(2) || 0} | Z: ${a.z?.toFixed(2) || 0}`;
+        const values = [a.x||0, a.y||0, a.z||0];
+        document.getElementById('accelValue').textContent = 
+          `X:${values[0].toFixed(1)} Y:${values[1].toFixed(1)} Z:${values[2].toFixed(1)}`;
+        addData(accelChart, values, null);
       }
+
       if (event.rotationRate) {
-        gyroEl.textContent = `X: ${event.rotationRate.alpha?.toFixed(2) || 0} | Y: ${event.rotationRate.beta?.toFixed(2) || 0} | Z: ${event.rotationRate.gamma?.toFixed(2) || 0}`;
+        const g = event.rotationRate;
+        const values = [g.alpha||0, g.beta||0, g.gamma||0];
+        document.getElementById('gyroValue').textContent = 
+          `X:${values[0].toFixed(1)} Y:${values[1].toFixed(1)} Z:${values[2].toFixed(1)}`;
+        addData(gyroChart, values, null);
       }
     }
 
-    // Device Orientation
     function handleOrientation(event) {
-      orientEl.textContent = `α: ${event.alpha?.toFixed(0) || 0}° | β: ${event.beta?.toFixed(0) || 0}° | γ: ${event.gamma?.toFixed(0) || 0}°`;
+      const values = [event.alpha||0, event.beta||0, event.gamma||0];
+      document.getElementById('orientValue').textContent = 
+        `α:${values[0].toFixed(0)} β:${values[1].toFixed(0)} γ:${values[2].toFixed(0)}`;
+      addData(orientChart, values, null);
     }
 
-    // Request sensor permissions
     async function requestPermissions() {
-      statusEl.textContent = "Requesting permissions...";
+      document.getElementById('status').textContent = "Requesting sensors...";
       
-      // Device Motion
-      if (typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-          await DeviceMotionEvent.requestPermission();
-        } catch(e) {}
+      if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch(e) {}
       }
-      window.addEventListener('devicemotion', handleMotion);
+      if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
+        try { await DeviceOrientationEvent.requestPermission(); } catch(e) {}
+      }
 
-      // Device Orientation
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          await DeviceOrientationEvent.requestPermission();
-        } catch(e) {}
-      }
+      window.addEventListener('devicemotion', handleMotion);
       window.addEventListener('deviceorientation', handleOrientation);
 
-      statusEl.textContent = "Sensors active • Move your head!";
-      log("Sensor listeners added");
+      document.getElementById('status').textContent = "✅ Live charts active • Move your head";
     }
 
-    // Geolocation
     function getLocation() {
-      if (!navigator.geolocation) {
-        statusEl.textContent = "Geolocation not supported";
-        return;
-      }
-      statusEl.textContent = "Getting location...";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          geoEl.textContent = `Lat: ${pos.coords.latitude.toFixed(4)} | Lon: ${pos.coords.longitude.toFixed(4)}`;
-          statusEl.textContent = "Location updated";
-          log(`Location: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+          document.getElementById('geo').textContent = 
+            `Lat: ${pos.coords.latitude.toFixed(4)} | Lon: ${pos.coords.longitude.toFixed(4)}`;
         },
-        (err) => {
-          statusEl.textContent = "Location error: " + err.message;
-          log("Geo error: " + err.message);
-        }
+        () => {}
       );
     }
 
-    // Input event handling (Neural Band / D-pad simulation)
     function handleInput(e) {
-      let key = e.key || 'Unknown';
-      let msg = `Input: ${key}`;
-      if (e.key === 'ArrowUp') msg = '↑ Neural Band / D-pad Up';
-      if (e.key === 'ArrowDown') msg = '↓ Neural Band / D-pad Down';
-      if (e.key === 'ArrowLeft') msg = '← Left';
-      if (e.key === 'ArrowRight') msg = '→ Right';
-      if (e.key === 'Enter') msg = '✓ Select';
-
-      inputLogEl.textContent = msg;
-      log(msg);
+      let msg = e.key === 'ArrowUp' ? '↑ Up' :
+                e.key === 'ArrowDown' ? '↓ Down' :
+                e.key === 'Enter' ? '✓ Select' : e.key;
+      document.getElementById('input-log').textContent = msg;
     }
 
-    // Keyboard / input listener for testing on glasses
-    document.addEventListener('keydown', handleInput);
+    function log(msg) {
+      const time = new Date().toLocaleTimeString('en-US', {hour12:false, minute:'2-digit', second:'2-digit'});
+      const logEl = document.getElementById('log');
+      logEl.textContent = `[${time}] ${msg}\n` + logEl.textContent;
+      if (logEl.textContent.split('\n').length > 8) logEl.textContent = logEl.textContent.split('\n').slice(0,8).join('\n');
+    }
 
-    // Initial log
-    log("Dashboard loaded on Ray-Ban Display");
-    statusEl.textContent = "Click 'Enable All Sensors' to begin";
-
-    // Auto-update loop for smoother display
-    setInterval(() => {}, 100);
+    // Auto-start everything
+    window.onload = () => {
+      initCharts();
+      log("Dashboard with live charts loaded");
+      requestPermissions();
+      document.addEventListener('keydown', handleInput);
+      setTimeout(getLocation, 1000);
+    };
   </script>
 </body>
 </html>
