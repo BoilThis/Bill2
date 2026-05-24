@@ -3,118 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
-  <title>HeadTilt Balance 👓</title>
+  <title>HeadTilt Balance 👓 v4 - Calibrated</title>
   <style>
     body {
       margin: 0; padding: 0; width: 600px; height: 600px;
       background: rgba(0,0,0,0.92); color: #0ff; font-family: system-ui, sans-serif;
-      overflow: hidden; touch-action: none;
+      overflow: hidden;
     }
     canvas { display: block; margin: 0 auto; }
-    .overlay {
-      position: absolute; top: 20px; left: 0; right: 0; text-align: center;
-      pointer-events: none; font-size: 22px; text-shadow: 0 0 10px #0ff;
+    .overlay { 
+      position: absolute; top: 15px; left: 0; right: 0; text-align: center;
+      pointer-events: none; font-size: 22px; text-shadow: 0 0 10px #0ff; 
+    }
+    .debug {
+      position: absolute; bottom: 120px; left: 10px; font-size: 13px;
+      background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; line-height: 1.4;
+      max-width: 340px;
     }
     button, .focusable {
       position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-      padding: 12px 30px; font-size: 18px; background: #0ff; color: #000;
-      border: none; border-radius: 10px; font-weight: bold; cursor: pointer;
+      padding: 14px 32px; font-size: 18px; background: #0ff; color: #000;
+      border: none; border-radius: 10px; font-weight: bold;
     }
-    button:active, .focusable:focus { background: #0cc; }
   </style>
 </head>
 <body>
   <canvas id="game" width="600" height="600"></canvas>
   
   <div class="overlay" id="score">Score: 0</div>
-  <div class="overlay" id="status" style="top: 60px; font-size:18px;"></div>
+  <div class="overlay" id="status" style="top: 55px; font-size:18px;">Press Enable Sensors</div>
   
-  <button onclick="resetGame()" class="focusable">Restart Game</button>
+  <div class="debug" id="debug">
+    Beta: 0° | Gamma: 0°<br>
+    Offset β: 0 | γ: 0<br>
+    Calibrated: No
+  </div>
+
+  <button onclick="enableSensors()" class="focusable" id="mainBtn">Enable Sensors</button>
 
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     let ball = { x: 300, y: 150, radius: 18, vx: 0, vy: 0 };
-    let score = 0;
-    let gameOver = false;
+    let score = 0, gameOver = false;
     let targets = [];
     let tiltX = 0, tiltY = 0;
 
-    // Generate random targets
+    // Calibration
+    let offsetBeta = 0;
+    let offsetGamma = 0;
+    let isCalibrating = false;
+    let calibrationSamples = [];
+    let isCalibrated = false;
+
     function generateTargets() {
       targets = [];
       for (let i = 0; i < 8; i++) {
-        targets.push({
-          x: 80 + Math.random() * 440,
-          y: 80 + Math.random() * 440,
-          r: 12
-        });
+        targets.push({ x: 80 + Math.random() * 440, y: 80 + Math.random() * 440, r: 12 });
       }
     }
 
     function draw() {
       ctx.clearRect(0, 0, 600, 600);
-
-      // Simple maze walls (rectangles)
       ctx.fillStyle = '#0ff';
-      ctx.fillRect(0, 0, 600, 40);           // top
-      ctx.fillRect(0, 560, 600, 40);         // bottom
-      ctx.fillRect(0, 0, 40, 600);           // left
-      ctx.fillRect(560, 0, 40, 600);         // right
-      ctx.fillRect(150, 150, 300, 20);       // horizontal walls
-      ctx.fillRect(150, 300, 20, 200);
+      ctx.fillRect(0, 0, 600, 40); ctx.fillRect(0, 560, 600, 40);
+      ctx.fillRect(0, 0, 40, 600); ctx.fillRect(560, 0, 40, 600);
+      ctx.fillRect(150, 150, 300, 20); ctx.fillRect(150, 300, 20, 200);
       ctx.fillRect(430, 250, 20, 200);
 
-      // Draw targets
       ctx.fillStyle = '#f0f';
-      targets.forEach(t => {
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      targets.forEach(t => { ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI*2); ctx.fill(); });
 
-      // Draw ball
       ctx.fillStyle = '#0f0';
-      ctx.shadowBlur = 30;
-      ctx.shadowColor = '#0f0';
-      ctx.beginPath();
-      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.shadowBlur = 30; ctx.shadowColor = '#0f0';
+      ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2); ctx.fill();
       ctx.shadowBlur = 0;
     }
 
     function update() {
-      if (gameOver) return;
+      if (gameOver || !isCalibrated) return;
 
-      // Apply tilt (sensitivity adjustable)
-      ball.vx += tiltX * 0.35;
-      ball.vy += tiltY * 0.35;
+      ball.vx += tiltX * 0.5;
+      ball.vy += tiltY * 0.75;   // up/down sensitivity
 
-      // Friction
-      ball.vx *= 0.92;
-      ball.vy *= 0.92;
+      ball.vx *= 0.88;
+      ball.vy *= 0.88;
 
       ball.x += ball.vx;
       ball.y += ball.vy;
 
-      // Wall collisions
-      if (ball.x - ball.radius < 50) { ball.x = 50 + ball.radius; ball.vx = -ball.vx * 0.6; }
-      if (ball.x + ball.radius > 550) { ball.x = 550 - ball.radius; ball.vx = -ball.vx * 0.6; }
-      if (ball.y - ball.radius < 50) { ball.y = 50 + ball.radius; ball.vy = -ball.vy * 0.6; }
-      if (ball.y + ball.radius > 550) { ball.y = 550 - ball.radius; ball.vy = -ball.vy * 0.6; }
-
-      // Inner walls (simple checks)
-      if (ball.y > 140 && ball.y < 180 && ball.x > 130 && ball.x < 470) {
-        ball.y = 140 - ball.radius; ball.vy = -ball.vy * 0.7;
-      }
-      // ... (add more if needed)
+      // Boundaries
+      if (ball.x < 55) { ball.x = 55; ball.vx *= -0.6; }
+      if (ball.x > 545) { ball.x = 545; ball.vx *= -0.6; }
+      if (ball.y < 55) { ball.y = 55; ball.vy *= -0.6; }
+      if (ball.y > 545) { ball.y = 545; ball.vy *= -0.6; }
 
       // Collect targets
-      for (let i = targets.length - 1; i >= 0; i--) {
+      for (let i = targets.length-1; i >= 0; i--) {
         const t = targets[i];
-        const dx = ball.x - t.x;
-        const dy = ball.y - t.y;
-        if (dx * dx + dy * dy < (ball.radius + t.r) ** 2) {
+        const d = Math.hypot(ball.x - t.x, ball.y - t.y);
+        if (d < ball.radius + t.r) {
           targets.splice(i, 1);
           score += 100;
           document.getElementById('score').textContent = `Score: ${score}`;
@@ -123,48 +111,101 @@
 
       if (targets.length === 0) {
         gameOver = true;
-        document.getElementById('status').textContent = "🎉 YOU WIN! All targets collected!";
+        document.getElementById('status').textContent = "🎉 YOU WIN!";
       }
-
       draw();
     }
 
-    // Sensor input
     function handleOrientation(e) {
-      tiltX = (e.gamma || 0) / 90;   // left-right
-      tiltY = (e.beta || 0) / 90;    // forward-back
+      const rawBeta = e.beta || 0;
+      const rawGamma = e.gamma || 0;
+
+      tiltY = (rawBeta - offsetBeta) / 55;
+      tiltX = (rawGamma - offsetGamma) / 60;
+
+      document.getElementById('debug').innerHTML = 
+        `Beta: ${rawBeta.toFixed(1)}° | Gamma: ${rawGamma.toFixed(1)}°<br>` +
+        `Offset β: ${offsetBeta.toFixed(1)} | γ: ${offsetGamma.toFixed(1)}<br>` +
+        `Calibrated: ${isCalibrated ? 'Yes ✓' : 'No'}`;
     }
 
-    // Keyboard fallback (D-pad / Neural Band)
-    document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowLeft') tiltX = -0.8;
-      if (e.key === 'ArrowRight') tiltX = 0.8;
-      if (e.key === 'ArrowUp') tiltY = -0.8;
-      if (e.key === 'ArrowDown') tiltY = 0.8;
-      if (e.key === 'r' || e.key === 'R') resetGame();
-    });
+    function handleMotion(e) {
+      if (e.rotationRate && isCalibrated) {
+        const pitchRate = e.rotationRate.beta || 0;
+        if (Math.abs(pitchRate) > 1.5) tiltY += pitchRate * 0.01;
+      }
+    }
+
+    // === CALIBRATION ===
+    function startCalibration() {
+      isCalibrating = true;
+      calibrationSamples = [];
+      document.getElementById('status').textContent = "Hold head straight & still... (3 sec)";
+      document.getElementById('mainBtn').textContent = "Calibrating...";
+
+      setTimeout(() => {
+        isCalibrating = false;
+        if (calibrationSamples.length > 5) {
+          let sumBeta = 0, sumGamma = 0;
+          calibrationSamples.forEach(s => {
+            sumBeta += s.beta;
+            sumGamma += s.gamma;
+          });
+          offsetBeta = sumBeta / calibrationSamples.length;
+          offsetGamma = sumGamma / calibrationSamples.length;
+          isCalibrated = true;
+        }
+        document.getElementById('status').textContent = "✅ Calibrated! Tilt your head to play";
+        document.getElementById('mainBtn').textContent = "Restart Game";
+        document.getElementById('mainBtn').onclick = resetGame;
+      }, 3200);
+    }
+
+    // Collect samples during calibration
+    function collectCalibrationSample(e) {
+      if (isCalibrating) {
+        calibrationSamples.push({ beta: e.beta || 0, gamma: e.gamma || 0 });
+      }
+    }
+
+    async function enableSensors() {
+      document.getElementById('status').textContent = "Requesting permissions...";
+
+      if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
+        try { await DeviceOrientationEvent.requestPermission(); } catch(e) {}
+      }
+      if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch(e) {}
+      }
+
+      window.addEventListener('deviceorientation', handleOrientation);
+      window.addEventListener('deviceorientation', collectCalibrationSample);
+      window.addEventListener('devicemotion', handleMotion);
+
+      // Auto start calibration after sensors are enabled
+      setTimeout(startCalibration, 800);
+    }
 
     function resetGame() {
-      ball.x = 300; ball.y = 150;
-      ball.vx = 0; ball.vy = 0;
-      score = 0;
-      gameOver = false;
+      ball.x = 300; ball.y = 150; ball.vx = ball.vy = 0;
+      score = 0; gameOver = false;
       document.getElementById('score').textContent = 'Score: 0';
-      document.getElementById('status').textContent = 'Tilt your head!';
       generateTargets();
+      document.getElementById('status').textContent = "Tilt head to move the ball";
     }
 
-    // Auto start
     window.onload = () => {
       resetGame();
-      // Enable sensors
-      if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission().catch(() => {});
-      }
-      window.addEventListener('deviceorientation', handleOrientation);
+      setInterval(update, 16);
 
-      setInterval(update, 16); // ~60fps
-      document.getElementById('status').textContent = 'Tilt your head to move!';
+      // Keyboard fallback
+      document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowUp') tiltY = -1.2;
+        if (e.key === 'ArrowDown') tiltY = 1.2;
+        if (e.key === 'ArrowLeft') tiltX = -1.2;
+        if (e.key === 'ArrowRight') tiltX = 1.2;
+        if (e.key === 'c' || e.key === 'C') startCalibration();
+      });
     };
   </script>
 </body>
