@@ -1,175 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Input Tracker • Meta Glasses WebApp</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=600, initial-scale=1.0">
+  <title>Grok Vision Assistant</title>
+  <style>
     body {
-        margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif;
-        background: #0a0a0a; color: #00ffcc; overflow: hidden;
-        height: 100vh; display: flex; flex-direction: column;
+      margin: 0; padding: 20px; width: 600px; height: 600px;
+      background: rgba(0,0,0,0.8); color: #0ff; font-family: system-ui;
+      overflow: hidden; text-align: center; /* Dark for transparent display */
     }
-    .hud {
-        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(10, 10, 20, 0.85); backdrop-filter: blur(8px);
-        border: 1px solid rgba(0, 255, 204, 0.3);
+    h1 { font-size: 28px; margin: 10px 0; }
+    .content { margin: 20px; padding: 15px; background: rgba(0,255,255,0.1); border-radius: 12px; }
+    button, .focusable {
+      padding: 12px 24px; margin: 8px; font-size: 18px;
+      background: #0ff; color: #000; border: none; border-radius: 8px;
+      cursor: pointer; width: 80%;
     }
-    header {
-        text-align: center; padding: 10px; background: rgba(0,0,0,0.6);
-        font-size: 18px; letter-spacing: 2px;
-    }
-    .grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-        padding: 15px; flex: 1; overflow: hidden;
-    }
-    .panel {
-        background: rgba(20, 30, 50, 0.7); border: 1px solid #00ffcc33;
-        border-radius: 8px; padding: 12px; font-size: 14px;
-    }
-    .log {
-        height: 180px; overflow-y: auto; background: #00000088;
-        font-family: monospace; font-size: 13px; padding: 8px;
-        border-radius: 4px; white-space: pre-wrap;
-    }
-    .value {
-        font-size: 22px; font-weight: bold; color: #00ff88;
-    }
-    button {
-        background: #00ffcc; color: #000; border: none;
-        padding: 8px 16px; margin: 5px; border-radius: 4px;
-        cursor: pointer; font-weight: bold;
-    }
-    .status { font-size: 12px; }
-    video { width: 100%; max-height: 140px; background: #000; border-radius: 6px; }
-</style>
+    button:hover, .focusable:focus { background: #0cc; }
+    #status { font-size: 16px; min-height: 60px; }
+    /* High contrast + simple for glasses */
+  </style>
 </head>
 <body>
+  <h1>👓 Grok on Ray-Ban</h1>
+  <div class="content">
+    <p>Say "Hey Meta" for voice/camera or use buttons below.</p>
+    <button onclick="startVoice()" class="focusable">🎤 Start Voice Mode</button>
+    <button onclick="simulateCamera()" class="focusable">📹 Simulate POV Camera</button>
+  </div>
+  <div id="status">Ready — Use D-pad / Neural Band to navigate</div>
 
-<div class="hud">
-    <header>🔍 INPUT TRACKER — Meta Ray-Ban WebApp Demo</header>
-    
-    <div class="grid">
-        <!-- Voice -->
-        <div class="panel">
-            <strong>🎤 Voice Input</strong><br>
-            <button onclick="startVoice()">Start Listening</button>
-            <button onclick="stopVoice()">Stop</button>
-            <div id="voice-status" class="status">Ready</div>
-            <div id="transcript" style="margin-top:8px; min-height:40px;"></div>
-        </div>
-
-        <!-- Head Orientation -->
-        <div class="panel">
-            <strong>🧭 Head / Device Orientation</strong>
-            <div>Alpha (Z): <span id="alpha" class="value">0°</span></div>
-            <div>Beta (X): <span id="beta" class="value">0°</span></div>
-            <div>Gamma (Y): <span id="gamma" class="value">0°</span></div>
-        </div>
-
-        <!-- Touch -->
-        <div class="panel">
-            <strong>👆 Touch on Frames</strong>
-            <div id="touch-log" class="log">Touch events will appear here...</div>
-        </div>
-
-        <!-- Camera -->
-        <div class="panel">
-            <strong>📷 Camera Feed (Light AR Preview)</strong>
-            <video id="camera" autoplay playsinline></video>
-            <button onclick="startCamera()">Enable Camera</button>
-        </div>
-    </div>
-
-    <!-- Live Log -->
-    <div class="panel" style="margin:15px; grid-column: 1 / -1;">
-        <strong>📜 Real-time Event Log</strong>
-        <div id="event-log" class="log"></div>
-    </div>
-</div>
-
-<script>
-// Device Orientation
-let orientationEnabled = false;
-function handleOrientation(event) {
-    document.getElementById('alpha').textContent = Math.round(event.alpha || 0) + '°';
-    document.getElementById('beta').textContent = Math.round(event.beta || 0) + '°';
-    document.getElementById('gamma').textContent = Math.round(event.gamma || 0) + '°';
-    
-    logEvent(`Head moved → α:${Math.round(event.alpha)} β:${Math.round(event.beta)} γ:${Math.round(event.gamma)}`);
-}
-window.addEventListener('deviceorientation', handleOrientation);
-
-// Touch Events
-const touchLog = document.getElementById('touch-log');
-document.addEventListener('touchstart', e => {
-    touchLog.innerHTML += `Touch Start (${e.touches.length} fingers)<br>`;
-    touchLog.scrollTop = touchLog.scrollHeight;
-    logEvent('Touch Start');
-});
-document.addEventListener('touchmove', e => {
-    logEvent(`Touch Move (${e.touches.length} fingers)`);
-});
-document.addEventListener('touchend', () => {
-    logEvent('Touch End');
-});
-
-// Voice Recognition
-let recognition;
-function startVoice() {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        alert("Speech Recognition not supported in this browser");
-        return;
+  <script>
+    function updateStatus(msg) {
+      document.getElementById('status').textContent = msg;
     }
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    
-    recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-        }
-        document.getElementById('transcript').textContent = transcript;
-        logEvent(`Voice: "${transcript}"`);
-    };
-    
-    recognition.onerror = (e) => logEvent(`Voice Error: ${e.error}`);
-    recognition.start();
-    document.getElementById('voice-status').textContent = '🎙️ Listening...';
-}
-function stopVoice() {
-    if (recognition) recognition.stop();
-    document.getElementById('voice-status').textContent = 'Stopped';
-}
 
-// Camera
-async function startCamera() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        document.getElementById('camera').srcObject = stream;
-        logEvent('Camera enabled (environment mode)');
-    } catch (err) {
-        logEvent('Camera permission denied or not available');
+    function startVoice() {
+      updateStatus('Voice activated — Speak now (uses Meta AI integration)');
+      // In real glasses: Trigger Meta voice or Web Speech if available
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance("Hello! How can I assist with your view today?");
+        speechSynthesis.speak(utterance);
+      }
     }
-}
 
-// General logging
-const eventLog = document.getElementById('event-log');
-function logEvent(msg) {
-    const time = new Date().toLocaleTimeString('en-US', {hour12:false, hour:"2-digit", minute:"2-digit", second:"2-digit"});
-    eventLog.innerHTML += `[${time}] ${msg}<br>`;
-    eventLog.scrollTop = eventLog.scrollHeight;
-}
-
-// Auto-log on load
-window.onload = () => {
-    logEvent('WebApp loaded — Input Tracker ready');
-    if (window.DeviceOrientationEvent) {
-        logEvent('DeviceOrientation API supported');
+    function simulateCamera() {
+      updateStatus('POV Camera active (in full version: streams via Meta SDK companion)');
+      // Placeholder — real camera access often needs phone-side SDK + display overlay
+      setTimeout(() => updateStatus('📸 Captured view! Describe what you see?'), 1500);
     }
-};
-</script>
 
+    // D-pad / focus simulation (Meta handles input)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') updateStatus('Navigated down');
+    });
+
+    updateStatus('Web App loaded on Ray-Ban Display');
+  </script>
 </body>
 </html>
