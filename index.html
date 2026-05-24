@@ -2,58 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=600, initial-scale=1.0">
+  <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
   <title>Grok Vision Assistant</title>
   <style>
     body {
       margin: 0; padding: 20px; width: 600px; height: 600px;
-      background: rgba(0,0,0,0.8); color: #0ff; font-family: system-ui;
-      overflow: hidden; text-align: center; /* Dark for transparent display */
+      background: rgba(0,0,0,0.85); color: #0ff; font-family: system-ui, sans-serif;
+      overflow: hidden; text-align: center; box-sizing: border-box;
     }
-    h1 { font-size: 28px; margin: 10px 0; }
-    .content { margin: 20px; padding: 15px; background: rgba(0,255,255,0.1); border-radius: 12px; }
+    h1 { font-size: 32px; margin: 10px 0; text-shadow: 0 0 10px #0ff; }
+    .panel { 
+      background: rgba(0,255,255,0.15); border: 2px solid #0ff; 
+      border-radius: 12px; padding: 20px; margin: 15px 0; 
+    }
     button, .focusable {
-      padding: 12px 24px; margin: 8px; font-size: 18px;
-      background: #0ff; color: #000; border: none; border-radius: 8px;
-      cursor: pointer; width: 80%;
+      padding: 16px 32px; margin: 10px; font-size: 20px; width: 80%;
+      background: #0ff; color: #000; border: none; border-radius: 10px;
+      font-weight: bold; cursor: pointer;
     }
-    button:hover, .focusable:focus { background: #0cc; }
-    #status { font-size: 16px; min-height: 60px; }
-    /* High contrast + simple for glasses */
+    button:active, .focusable:focus { background: #0cc; transform: scale(1.05); }
+    #status { font-size: 18px; min-height: 80px; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>👓 Grok on Ray-Ban</h1>
-  <div class="content">
-    <p>Say "Hey Meta" for voice/camera or use buttons below.</p>
-    <button onclick="startVoice()" class="focusable">🎤 Start Voice Mode</button>
-    <button onclick="simulateCamera()" class="focusable">📹 Simulate POV Camera</button>
+  <h1>👓 Grok on Ray-Ban Display</h1>
+  
+  <div class="panel">
+    <p>Use Neural Band or D-pad.<br>Say "Hey Meta" for camera/voice.</p>
+    <button onclick="activateVoice()" class="focusable">🎤 Voice Query</button>
+    <button onclick="simulateCameraView()" class="focusable">📹 Request Camera View</button>
   </div>
-  <div id="status">Ready — Use D-pad / Neural Band to navigate</div>
+
+  <div id="status">Connected • Ready for input</div>
 
   <script>
     function updateStatus(msg) {
       document.getElementById('status').textContent = msg;
     }
 
-    function startVoice() {
-      updateStatus('Voice activated — Speak now (uses Meta AI integration)');
-      // In real glasses: Trigger Meta voice or Web Speech if available
+    function activateVoice() {
+      updateStatus('Voice mode active — Use "Hey Meta" or speak now');
+      // Web Speech fallback for TTS
       if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance("Hello! How can I assist with your view today?");
-        speechSynthesis.speak(utterance);
+        const u = new SpeechSynthesisUtterance("How can I help with what you're seeing?");
+        speechSynthesis.speak(u);
       }
     }
 
-    function simulateCamera() {
-      updateStatus('POV Camera active (in full version: streams via Meta SDK companion)');
-      // Placeholder — real camera access often needs phone-side SDK + display overlay
-      setTimeout(() => updateStatus('📸 Captured view! Describe what you see?'), 1500);
+    function simulateCameraView() {
+      updateStatus('📸 Requesting POV camera... (handled via Meta AI / companion app)');
+      setTimeout(() => {
+        updateStatus('Live view active — Describe or analyze scene?');
+        // In full hybrid setup: trigger mobile SDK camera feed here
+      }, 800);
     }
 
-    // D-pad / focus simulation (Meta handles input)
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') updateStatus('Navigated down');
+    // Keyboard simulation for testing (D-pad / Neural Band)
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp') updateStatus('↑ Navigated Up');
+      if (e.key === 'ArrowDown') updateStatus('↓ Navigated Down');
+      if (e.key === 'Enter') updateStatus('Selected');
+    });
+
+    // Auto sensor example (motion)
+    window.addEventListener('deviceorientation', e => {
+      if (Math.random() > 0.95) console.log('Head tilt detected:', e.beta);
     });
 
     updateStatus('Web App loaded on Ray-Ban Display');
