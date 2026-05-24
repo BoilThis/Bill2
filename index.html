@@ -2,185 +2,173 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tilt Maze - Ray-Ban Glasses</title>
+<title>Input Tracker • Meta Glasses WebApp</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body { margin:0; background:#000; overflow:hidden; font-family:Arial; }
-  canvas { display:block; }
-  #info {
-    position: absolute; top: 10px; left: 10px; color: #0f0; font-size: 18px;
-    text-shadow: 0 0 5px #0f0; pointer-events: none;
-  }
+    body {
+        margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif;
+        background: #0a0a0a; color: #00ffcc; overflow: hidden;
+        height: 100vh; display: flex; flex-direction: column;
+    }
+    .hud {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(10, 10, 20, 0.85); backdrop-filter: blur(8px);
+        border: 1px solid rgba(0, 255, 204, 0.3);
+    }
+    header {
+        text-align: center; padding: 10px; background: rgba(0,0,0,0.6);
+        font-size: 18px; letter-spacing: 2px;
+    }
+    .grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        padding: 15px; flex: 1; overflow: hidden;
+    }
+    .panel {
+        background: rgba(20, 30, 50, 0.7); border: 1px solid #00ffcc33;
+        border-radius: 8px; padding: 12px; font-size: 14px;
+    }
+    .log {
+        height: 180px; overflow-y: auto; background: #00000088;
+        font-family: monospace; font-size: 13px; padding: 8px;
+        border-radius: 4px; white-space: pre-wrap;
+    }
+    .value {
+        font-size: 22px; font-weight: bold; color: #00ff88;
+    }
+    button {
+        background: #00ffcc; color: #000; border: none;
+        padding: 8px 16px; margin: 5px; border-radius: 4px;
+        cursor: pointer; font-weight: bold;
+    }
+    .status { font-size: 12px; }
+    video { width: 100%; max-height: 140px; background: #000; border-radius: 6px; }
 </style>
 </head>
 <body>
 
-<div id="info">Tilt your head to move the ball • Reach the green goal</div>
-<canvas id="canvas"></canvas>
+<div class="hud">
+    <header>🔍 INPUT TRACKER — Meta Ray-Ban WebApp Demo</header>
+    
+    <div class="grid">
+        <!-- Voice -->
+        <div class="panel">
+            <strong>🎤 Voice Input</strong><br>
+            <button onclick="startVoice()">Start Listening</button>
+            <button onclick="stopVoice()">Stop</button>
+            <div id="voice-status" class="status">Ready</div>
+            <div id="transcript" style="margin-top:8px; min-height:40px;"></div>
+        </div>
+
+        <!-- Head Orientation -->
+        <div class="panel">
+            <strong>🧭 Head / Device Orientation</strong>
+            <div>Alpha (Z): <span id="alpha" class="value">0°</span></div>
+            <div>Beta (X): <span id="beta" class="value">0°</span></div>
+            <div>Gamma (Y): <span id="gamma" class="value">0°</span></div>
+        </div>
+
+        <!-- Touch -->
+        <div class="panel">
+            <strong>👆 Touch on Frames</strong>
+            <div id="touch-log" class="log">Touch events will appear here...</div>
+        </div>
+
+        <!-- Camera -->
+        <div class="panel">
+            <strong>📷 Camera Feed (Light AR Preview)</strong>
+            <video id="camera" autoplay playsinline></video>
+            <button onclick="startCamera()">Enable Camera</button>
+        </div>
+    </div>
+
+    <!-- Live Log -->
+    <div class="panel" style="margin:15px; grid-column: 1 / -1;">
+        <strong>📜 Real-time Event Log</strong>
+        <div id="event-log" class="log"></div>
+    </div>
+</div>
 
 <script>
-// ============== CONFIG ==============
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-
-let WIDTH = 600;
-let HEIGHT = 600;
-canvas.width = WIDTH;
-canvas.height = HEIGHT;
-
-// Ball
-let ball = { x: 80, y: 80, radius: 12, vx: 0, vy: 0 };
-
-// Goal
-const goal = { x: 480, y: 480, size: 30 };
-
-// Simple maze walls (x, y, width, height)
-const walls = [
-  // Border
-  {x:0, y:0, w:WIDTH, h:20},
-  {x:0, y:HEIGHT-20, w:WIDTH, h:20},
-  {x:0, y:0, w:20, h:HEIGHT},
-  {x:WIDTH-20, y:0, w:20, h:HEIGHT},
-  
-  // Inner walls
-  {x:150, y:100, w:20, h:250},
-  {x:300, y:50,  w:20, h:200},
-  {x:450, y:200, w:20, h:250},
-  {x:80,  y:350, w:250, h:20},
-  {x:380, y:380, w:180, h:20},
-  {x:200, y:480, w:20, h:100},
-];
-
-// Game state
-let gameOver = false;
-let won = false;
-
-// ============== SENSOR SETUP ==============
-let tiltX = 0; // gamma (left/right)
-let tiltY = 0; // beta  (forward/back)
-
+// Device Orientation
+let orientationEnabled = false;
 function handleOrientation(event) {
-  tiltX = event.gamma || 0;   // -90 to 90 (left/right)
-  tiltY = event.beta || 0;    // -90 to 90 (forward/back)
+    document.getElementById('alpha').textContent = Math.round(event.alpha || 0) + '°';
+    document.getElementById('beta').textContent = Math.round(event.beta || 0) + '°';
+    document.getElementById('gamma').textContent = Math.round(event.gamma || 0) + '°';
+    
+    logEvent(`Head moved → α:${Math.round(event.alpha)} β:${Math.round(event.beta)} γ:${Math.round(event.gamma)}`);
 }
+window.addEventListener('deviceorientation', handleOrientation);
 
-// Request permission & start listening
-function startSensors() {
-  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission()
-      .then(permission => {
-        if (permission === 'granted') {
-          window.addEventListener('deviceorientation', handleOrientation);
-        }
-      });
-  } else {
-    // Most glasses/web environments don't need explicit permission
-    window.addEventListener('deviceorientation', handleOrientation);
-  }
-}
-
-// ============== GAME LOOP ==============
-function update() {
-  if (gameOver || won) return;
-
-  // Apply tilt to velocity (sensitivity tweakable)
-  const sensitivity = 0.12;
-  ball.vx += tiltX * sensitivity;
-  ball.vy += tiltY * sensitivity;
-
-  // Friction
-  ball.vx *= 0.92;
-  ball.vy *= 0.92;
-
-  // Move ball
-  ball.x += ball.vx;
-  ball.y += ball.vy;
-
-  // Wall collisions
-  for (let wall of walls) {
-    if (checkCollision(ball, wall)) {
-      // Simple bounce
-      if (Math.abs(ball.vx) > Math.abs(ball.vy)) ball.vx = -ball.vx * 0.6;
-      else ball.vy = -ball.vy * 0.6;
-      
-      // Push out of wall
-      if (ball.x < wall.x) ball.x = wall.x - ball.radius;
-      if (ball.x > wall.x + wall.w) ball.x = wall.x + wall.w + ball.radius;
-      if (ball.y < wall.y) ball.y = wall.y - ball.radius;
-      if (ball.y > wall.y + wall.h) ball.y = wall.y + wall.h + ball.radius;
-    }
-  }
-
-  // Boundary check
-  if (ball.x - ball.radius < 0) { ball.x = ball.radius; ball.vx = -ball.vx * 0.6; }
-  if (ball.x + ball.radius > WIDTH) { ball.x = WIDTH - ball.radius; ball.vx = -ball.vx * 0.6; }
-  if (ball.y - ball.radius < 0) { ball.y = ball.radius; ball.vy = -ball.vy * 0.6; }
-  if (ball.y + ball.radius > HEIGHT) { ball.y = HEIGHT - ball.radius; ball.vy = -ball.vy * 0.6; }
-
-  // Win condition
-  if (Math.hypot(ball.x - goal.x - goal.size/2, ball.y - goal.y - goal.size/2) < 30) {
-    won = true;
-    gameOver = true;
-  }
-}
-
-function checkCollision(ball, wall) {
-  return !(
-    ball.x + ball.radius < wall.x ||
-    ball.x - ball.radius > wall.x + wall.w ||
-    ball.y + ball.radius < wall.y ||
-    ball.y - ball.radius > wall.y + wall.h
-  );
-}
-
-function draw() {
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  // Draw walls
-  ctx.fillStyle = '#0ff';
-  for (let wall of walls) {
-    ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
-  }
-
-  // Draw goal
-  ctx.fillStyle = '#0f0';
-  ctx.fillRect(goal.x, goal.y, goal.size, goal.size);
-  ctx.fillStyle = '#000';
-  ctx.font = 'bold 20px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('GOAL', goal.x + goal.size/2, goal.y + goal.size/2 + 7);
-
-  // Draw ball
-  ctx.fillStyle = '#ff0';
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Win message
-  if (won) {
-    ctx.fillStyle = 'rgba(0,255,0,0.9)';
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('YOU WIN!', WIDTH/2, HEIGHT/2);
-  }
-}
-
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-
-// ============== START ==============
-startSensors();
-loop();
-
-// Optional: Reset with double-tap or gesture (you can expand this)
-document.addEventListener('dblclick', () => {
-  ball.x = 80; ball.y = 80;
-  ball.vx = 0; ball.vy = 0;
-  won = false; gameOver = false;
+// Touch Events
+const touchLog = document.getElementById('touch-log');
+document.addEventListener('touchstart', e => {
+    touchLog.innerHTML += `Touch Start (${e.touches.length} fingers)<br>`;
+    touchLog.scrollTop = touchLog.scrollHeight;
+    logEvent('Touch Start');
 });
+document.addEventListener('touchmove', e => {
+    logEvent(`Touch Move (${e.touches.length} fingers)`);
+});
+document.addEventListener('touchend', () => {
+    logEvent('Touch End');
+});
+
+// Voice Recognition
+let recognition;
+function startVoice() {
+    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+        alert("Speech Recognition not supported in this browser");
+        return;
+    }
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    
+    recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+        }
+        document.getElementById('transcript').textContent = transcript;
+        logEvent(`Voice: "${transcript}"`);
+    };
+    
+    recognition.onerror = (e) => logEvent(`Voice Error: ${e.error}`);
+    recognition.start();
+    document.getElementById('voice-status').textContent = '🎙️ Listening...';
+}
+function stopVoice() {
+    if (recognition) recognition.stop();
+    document.getElementById('voice-status').textContent = 'Stopped';
+}
+
+// Camera
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        document.getElementById('camera').srcObject = stream;
+        logEvent('Camera enabled (environment mode)');
+    } catch (err) {
+        logEvent('Camera permission denied or not available');
+    }
+}
+
+// General logging
+const eventLog = document.getElementById('event-log');
+function logEvent(msg) {
+    const time = new Date().toLocaleTimeString('en-US', {hour12:false, hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    eventLog.innerHTML += `[${time}] ${msg}<br>`;
+    eventLog.scrollTop = eventLog.scrollHeight;
+}
+
+// Auto-log on load
+window.onload = () => {
+    logEvent('WebApp loaded — Input Tracker ready');
+    if (window.DeviceOrientationEvent) {
+        logEvent('DeviceOrientation API supported');
+    }
+};
 </script>
 
 </body>
