@@ -3,73 +3,177 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
-  <title>Grok Vision Assistant</title>
+  <title>Grok Sensor Dashboard</title>
   <style>
     body {
       margin: 0; padding: 20px; width: 600px; height: 600px;
-      background: rgba(0,0,0,0.85); color: #0ff; font-family: system-ui, sans-serif;
-      overflow: hidden; text-align: center; box-sizing: border-box;
+      background: rgba(0,0,0,0.9); color: #0ff; font-family: system-ui, sans-serif;
+      overflow: hidden; box-sizing: border-box;
     }
-    h1 { font-size: 32px; margin: 10px 0; text-shadow: 0 0 10px #0ff; }
-    .panel { 
-      background: rgba(0,255,255,0.15); border: 2px solid #0ff; 
-      border-radius: 12px; padding: 20px; margin: 15px 0; 
+    h1 { font-size: 28px; margin: 0 0 15px 0; text-align: center; text-shadow: 0 0 8px #0ff; }
+    .grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
     }
+    .panel {
+      background: rgba(0, 255, 255, 0.1); border: 2px solid #0ff;
+      border-radius: 12px; padding: 15px; font-size: 18px;
+    }
+    .value { font-size: 22px; font-weight: bold; color: #0f0; margin: 4px 0; }
+    .label { font-size: 14px; opacity: 0.8; }
     button, .focusable {
-      padding: 16px 32px; margin: 10px; font-size: 20px; width: 80%;
+      padding: 14px 24px; margin: 8px 0; font-size: 18px; width: 100%;
       background: #0ff; color: #000; border: none; border-radius: 10px;
       font-weight: bold; cursor: pointer;
     }
-    button:active, .focusable:focus { background: #0cc; transform: scale(1.05); }
-    #status { font-size: 18px; min-height: 80px; margin-top: 20px; }
+    button:active, .focusable:focus {
+      background: #0cc; transform: scale(1.03);
+    }
+    #log {
+      margin-top: 15px; height: 120px; overflow-y: auto;
+      background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px;
+      font-size: 15px; white-space: pre-wrap;
+    }
+    .status { text-align: center; font-size: 16px; margin: 10px 0; }
   </style>
 </head>
 <body>
-  <h1>👓 Grok on Ray-Ban Display</h1>
+  <h1>👓 Grok Sensor Dashboard</h1>
   
-  <div class="panel">
-    <p>Use Neural Band or D-pad.<br>Say "Hey Meta" for camera/voice.</p>
-    <button onclick="activateVoice()" class="focusable">🎤 Voice Query</button>
-    <button onclick="simulateCameraView()" class="focusable">📹 Request Camera View</button>
+  <div class="grid">
+    <!-- Accelerometer -->
+    <div class="panel">
+      <div class="label">Accelerometer (m/s²)</div>
+      <div class="value" id="accel">X: 0.00 | Y: 0.00 | Z: 0.00</div>
+    </div>
+
+    <!-- Gyroscope -->
+    <div class="panel">
+      <div class="label">Gyroscope (°/s)</div>
+      <div class="value" id="gyro">X: 0.00 | Y: 0.00 | Z: 0.00</div>
+    </div>
+
+    <!-- Orientation -->
+    <div class="panel">
+      <div class="label">Orientation (Tilt / Heading)</div>
+      <div class="value" id="orient">α: 0° | β: 0° | γ: 0°</div>
+    </div>
+
+    <!-- Geolocation -->
+    <div class="panel">
+      <div class="label">Location (from phone)</div>
+      <div class="value" id="geo">Lat: — | Lon: —</div>
+      <button onclick="getLocation()" class="focusable">📍 Get Location</button>
+    </div>
   </div>
 
-  <div id="status">Connected • Ready for input</div>
+  <div class="panel" style="grid-column: 1 / -1;">
+    <div class="label">Input Events (Neural Band / D-pad)</div>
+    <div id="input-log" style="font-size:18px; min-height:40px;">Waiting for input...</div>
+  </div>
+
+  <div class="status" id="status">Ready — Grant sensor permissions when prompted</div>
+  <button onclick="requestPermissions()" class="focusable">Enable All Sensors</button>
+
+  <div id="log">Event log will appear here...</div>
 
   <script>
-    function updateStatus(msg) {
-      document.getElementById('status').textContent = msg;
+    let accelEl = document.getElementById('accel');
+    let gyroEl = document.getElementById('gyro');
+    let orientEl = document.getElementById('orient');
+    let geoEl = document.getElementById('geo');
+    let statusEl = document.getElementById('status');
+    let logEl = document.getElementById('log');
+    let inputLogEl = document.getElementById('input-log');
+
+    function log(msg) {
+      const time = new Date().toLocaleTimeString('en-US', {hour12:false, minute:'2-digit', second:'2-digit'});
+      logEl.textContent = `[${time}] ${msg}\n` + logEl.textContent;
+      if (logEl.textContent.split('\n').length > 12) logEl.textContent = logEl.textContent.split('\n').slice(0,12).join('\n');
     }
 
-    function activateVoice() {
-      updateStatus('Voice mode active — Use "Hey Meta" or speak now');
-      // Web Speech fallback for TTS
-      if ('speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance("How can I help with what you're seeing?");
-        speechSynthesis.speak(u);
+    // Device Motion (Accelerometer + Gyro)
+    function handleMotion(event) {
+      const a = event.accelerationIncludingGravity || event.acceleration;
+      if (a) {
+        accelEl.textContent = `X: ${a.x?.toFixed(2) || 0} | Y: ${a.y?.toFixed(2) || 0} | Z: ${a.z?.toFixed(2) || 0}`;
+      }
+      if (event.rotationRate) {
+        gyroEl.textContent = `X: ${event.rotationRate.alpha?.toFixed(2) || 0} | Y: ${event.rotationRate.beta?.toFixed(2) || 0} | Z: ${event.rotationRate.gamma?.toFixed(2) || 0}`;
       }
     }
 
-    function simulateCameraView() {
-      updateStatus('📸 Requesting POV camera... (handled via Meta AI / companion app)');
-      setTimeout(() => {
-        updateStatus('Live view active — Describe or analyze scene?');
-        // In full hybrid setup: trigger mobile SDK camera feed here
-      }, 800);
+    // Device Orientation
+    function handleOrientation(event) {
+      orientEl.textContent = `α: ${event.alpha?.toFixed(0) || 0}° | β: ${event.beta?.toFixed(0) || 0}° | γ: ${event.gamma?.toFixed(0) || 0}°`;
     }
 
-    // Keyboard simulation for testing (D-pad / Neural Band)
-    document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowUp') updateStatus('↑ Navigated Up');
-      if (e.key === 'ArrowDown') updateStatus('↓ Navigated Down');
-      if (e.key === 'Enter') updateStatus('Selected');
-    });
+    // Request sensor permissions
+    async function requestPermissions() {
+      statusEl.textContent = "Requesting permissions...";
+      
+      // Device Motion
+      if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          await DeviceMotionEvent.requestPermission();
+        } catch(e) {}
+      }
+      window.addEventListener('devicemotion', handleMotion);
 
-    // Auto sensor example (motion)
-    window.addEventListener('deviceorientation', e => {
-      if (Math.random() > 0.95) console.log('Head tilt detected:', e.beta);
-    });
+      // Device Orientation
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          await DeviceOrientationEvent.requestPermission();
+        } catch(e) {}
+      }
+      window.addEventListener('deviceorientation', handleOrientation);
 
-    updateStatus('Web App loaded on Ray-Ban Display');
+      statusEl.textContent = "Sensors active • Move your head!";
+      log("Sensor listeners added");
+    }
+
+    // Geolocation
+    function getLocation() {
+      if (!navigator.geolocation) {
+        statusEl.textContent = "Geolocation not supported";
+        return;
+      }
+      statusEl.textContent = "Getting location...";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          geoEl.textContent = `Lat: ${pos.coords.latitude.toFixed(4)} | Lon: ${pos.coords.longitude.toFixed(4)}`;
+          statusEl.textContent = "Location updated";
+          log(`Location: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+        },
+        (err) => {
+          statusEl.textContent = "Location error: " + err.message;
+          log("Geo error: " + err.message);
+        }
+      );
+    }
+
+    // Input event handling (Neural Band / D-pad simulation)
+    function handleInput(e) {
+      let key = e.key || 'Unknown';
+      let msg = `Input: ${key}`;
+      if (e.key === 'ArrowUp') msg = '↑ Neural Band / D-pad Up';
+      if (e.key === 'ArrowDown') msg = '↓ Neural Band / D-pad Down';
+      if (e.key === 'ArrowLeft') msg = '← Left';
+      if (e.key === 'ArrowRight') msg = '→ Right';
+      if (e.key === 'Enter') msg = '✓ Select';
+
+      inputLogEl.textContent = msg;
+      log(msg);
+    }
+
+    // Keyboard / input listener for testing on glasses
+    document.addEventListener('keydown', handleInput);
+
+    // Initial log
+    log("Dashboard loaded on Ray-Ban Display");
+    statusEl.textContent = "Click 'Enable All Sensors' to begin";
+
+    // Auto-update loop for smoother display
+    setInterval(() => {}, 100);
   </script>
 </body>
 </html>
