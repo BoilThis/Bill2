@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
-  <title>HeadTilt Balance 👓 v4 - Calibrated</title>
+  <title>HeadTilt Balance 👓 v4.2 - Both Axes Inverted</title>
   <style>
     body {
       margin: 0; padding: 0; width: 600px; height: 600px;
@@ -84,7 +84,7 @@
       if (gameOver || !isCalibrated) return;
 
       ball.vx += tiltX * 0.5;
-      ball.vy += tiltY * 0.75;   // up/down sensitivity
+      ball.vy += tiltY * 0.75;
 
       ball.vx *= 0.88;
       ball.vy *= 0.88;
@@ -120,8 +120,9 @@
       const rawBeta = e.beta || 0;
       const rawGamma = e.gamma || 0;
 
-      tiltY = (rawBeta - offsetBeta) / 55;
-      tiltX = (rawGamma - offsetGamma) / 60;
+      // Both axes inverted as requested
+      tiltX = - (rawGamma - offsetGamma) / 60;   // ← LEFT/RIGHT swapped
+      tiltY = - (rawBeta - offsetBeta) / 55;     // ← UP/DOWN swapped
 
       document.getElementById('debug').innerHTML = 
         `Beta: ${rawBeta.toFixed(1)}° | Gamma: ${rawGamma.toFixed(1)}°<br>` +
@@ -132,11 +133,10 @@
     function handleMotion(e) {
       if (e.rotationRate && isCalibrated) {
         const pitchRate = e.rotationRate.beta || 0;
-        if (Math.abs(pitchRate) > 1.5) tiltY += pitchRate * 0.01;
+        if (Math.abs(pitchRate) > 1.5) tiltY += -pitchRate * 0.01;  // inverted
       }
     }
 
-    // === CALIBRATION ===
     function startCalibration() {
       isCalibrating = true;
       calibrationSamples = [];
@@ -161,7 +161,6 @@
       }, 3200);
     }
 
-    // Collect samples during calibration
     function collectCalibrationSample(e) {
       if (isCalibrating) {
         calibrationSamples.push({ beta: e.beta || 0, gamma: e.gamma || 0 });
@@ -182,7 +181,6 @@
       window.addEventListener('deviceorientation', collectCalibrationSample);
       window.addEventListener('devicemotion', handleMotion);
 
-      // Auto start calibration after sensors are enabled
       setTimeout(startCalibration, 800);
     }
 
@@ -198,7 +196,6 @@
       resetGame();
       setInterval(update, 16);
 
-      // Keyboard fallback
       document.addEventListener('keydown', e => {
         if (e.key === 'ArrowUp') tiltY = -1.2;
         if (e.key === 'ArrowDown') tiltY = 1.2;
