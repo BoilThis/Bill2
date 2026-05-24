@@ -3,46 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BILLY'S SHIRTS 🏭</title>
+    <title>BILLY'S DELIVERY</title>
     <style>
         :root { font-size: 21px; }
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0a0a0a;
-            color: #ff0;
+            background: #000;
+            color: #0ff;
             height: 100vh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
-            user-select: none;
         }
         header {
             width: 100%;
             text-align: center;
             padding: 16px;
-            background: linear-gradient(90deg, #ff0, #f80, #ff0);
+            background: linear-gradient(90deg, #0ff, #ff0, #0ff);
             color: #000;
-            font-size: 1.8rem;
+            font-size: 1.85rem;
             font-weight: 700;
         }
         #game-container {
             position: relative;
             margin: 12px;
-            border: 6px solid #ff0;
+            border: 6px solid #0ff;
             border-radius: 22px;
-            box-shadow: 0 0 60px #ff0;
+            box-shadow: 0 0 60px #0ff;
             overflow: hidden;
         }
-        canvas { display: block; background: #111; }
+        canvas { display: block; background: #112; }
         .overlay {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(15,15,25,0.97);
+            background: rgba(0,0,20,0.97);
             padding: 40px 50px;
             border-radius: 20px;
-            border: 5px solid #ff0;
+            border: 5px solid #0ff;
             text-align: center;
             display: none;
             flex-direction: column;
@@ -50,11 +49,11 @@
             min-width: 320px;
         }
         button {
-            background: linear-gradient(135deg, #ff0, #f80);
+            background: linear-gradient(135deg, #0ff, #ff0);
             color: #000;
             border: none;
-            padding: 20px 40px;
-            font-size: 1.45rem;
+            padding: 20px 44px;
+            font-size: 1.5rem;
             font-weight: 700;
             border-radius: 16px;
             cursor: pointer;
@@ -63,18 +62,15 @@
         .score, .highscore {
             position: absolute; background: rgba(0,0,0,0.8);
             padding: 10px 24px; border-radius: 999px;
-            font-weight: 700; border: 3px solid #ff0;
+            font-weight: 700; border: 3px solid #0ff;
         }
-        .score { top: 22px; left: 22px; font-size: 1.45rem; color: #ff0; }
-        .highscore { top: 22px; right: 22px; font-size: 1.1rem; color: #0ff; }
-        .instructions { 
-            position: absolute; bottom: 22px; text-align: center; 
-            font-size: 1rem; color: #aaa; width: 100%; 
-        }
+        .score { top: 22px; left: 22px; font-size: 1.45rem; color: #0ff; }
+        .highscore { top: 22px; right: 22px; font-size: 1.1rem; color: #ff0; }
+        .instructions { position: absolute; bottom: 22px; text-align: center; font-size: 1rem; color: #0aa; width: 100%; }
     </style>
 </head>
 <body>
-    <header>BILLY'S SHIRTS 🏭</header>
+    <header>BILLY'S DELIVERY 🛵</header>
     
     <div id="game-container">
         <div class="score" id="score">0m</div>
@@ -82,14 +78,14 @@
         <canvas id="canvas" width="520" height="520"></canvas>
         
         <div id="overlay" class="overlay">
-            <h2 id="title">BILLY'S SHIRTS</h2>
-            <div id="subtitle" style="color:#ff0; font-size:1.55rem;">Run the factory!</div>
-            <button onclick="startGame()">START RUNNING!</button>
+            <h2 id="title">BILLY'S DELIVERY</h2>
+            <div id="subtitle" style="color:#0ff; font-size:1.55rem;">Deliver the shirts!</div>
+            <button onclick="startGame()">START DELIVERING!</button>
         </div>
     </div>
 
     <div class="instructions">
-        ↑ JUMP &nbsp;&nbsp;&nbsp; ← → SWITCH LANE &nbsp;&nbsp;&nbsp; SPACE = PAUSE
+        ↑ THROW SHIRT &nbsp;&nbsp;&nbsp; ← → MOVE &nbsp;&nbsp;&nbsp; SPACE = PAUSE
     </div>
 
     <script>
@@ -101,204 +97,122 @@
         const title = document.getElementById('title');
         const subtitle = document.getElementById('subtitle');
 
-        let audioContext;
-        function initAudio() {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        function playSound(type) {
-            initAudio();
-            const now = audioContext.currentTime;
-            if (type === 'jump') {
-                const o = audioContext.createOscillator();
-                o.type = 'sine'; o.frequency.setValueAtTime(520, now);
-                o.frequency.exponentialRampToValueAtTime(920, now + 0.3);
-                const g = audioContext.createGain();
-                g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-                o.connect(g).connect(audioContext.destination);
-                o.start(now); o.stop(now + 0.45);
-            }
-            if (type === 'collect') {
-                const notes = [720, 920, 1240];
-                notes.forEach((f,i) => {
-                    setTimeout(() => {
-                        const osc = audioContext.createOscillator();
-                        osc.type = 'triangle'; osc.frequency.value = f;
-                        const gain = audioContext.createGain();
-                        gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-                        osc.connect(gain).connect(audioContext.destination);
-                        osc.start(now + i*0.04); osc.stop(now + i*0.04 + 0.5);
-                    }, i*35);
-                });
-            }
-            if (type === 'crash') {
-                const noise = audioContext.createBufferSource();
-                const buf = audioContext.createBuffer(1, audioContext.sampleRate * 0.8, audioContext.sampleRate);
-                const data = buf.getChannelData(0);
-                for (let i = 0; i < buf.length; i++) data[i] = Math.random() * 2 - 1;
-                noise.buffer = buf;
-                const filter = audioContext.createBiquadFilter();
-                filter.type = 'lowpass'; filter.frequency.setValueAtTime(1200, now);
-                const gain = audioContext.createGain();
-                gain.gain.setValueAtTime(1.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-                noise.connect(filter).connect(gain).connect(audioContext.destination);
-                noise.start(now);
-            }
-        }
-
-        let player = { lane: 1, y: 0, vy: 0, jumping: false };
+        let player = { x: 260, lane: 1, y: 0, throwing: false };
         let obstacles = [], shirts = [], particles = [];
-        let distance = 0, speed = 6.5;
+        let distance = 0, speed = 6.8;
         let gameRunning = false, paused = false;
         let gameInterval;
-        let highScore = localStorage.getItem('billyShirtsHigh') || 0;
+        let highScore = localStorage.getItem('billyDeliveryHigh') || 0;
+        let delivered = 0;
 
-        const LANES = [140, 260, 380];
+        const LANES = [160, 260, 360];
 
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x; this.y = y;
-                this.vx = (Math.random() - 0.5) * 8;
-                this.vy = (Math.random() - 0.5) * 8 - 2;
-                this.life = 25;
-                this.color = color; this.size = 4;
-            }
-            update() { this.x += this.vx; this.y += this.vy; this.vy += 0.25; this.life--; this.size *= 0.95; }
-            draw() {
-                ctx.globalAlpha = this.life / 25;
-                ctx.fillStyle = this.color;
-                ctx.shadowBlur = 10; ctx.shadowColor = this.color;
-                ctx.fillRect(this.x, this.y, this.size, this.size);
-            }
-        }
-
-        function createLightBurst(x, y, color) {
-            for (let i = 0; i < 12; i++) {
-                particles.push(new Particle(x, y, color));
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 18; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random()-0.5)*10,
+                    vy: (Math.random()-0.5)*10 - 4,
+                    life: 28,
+                    color
+                });
             }
         }
 
         function spawnObstacle() {
             if (Math.random() < 0.09) {
-                obstacles.push({ lane: Math.floor(Math.random()*3), x: 520, type: Math.random()<0.5 ? 'box' : 'machine' });
+                obstacles.push({ lane: Math.floor(Math.random()*3), x: 520 });
             }
         }
 
-        function spawnShirt() {
-            if (Math.random() < 0.55) {
-                shirts.push({ lane: Math.floor(Math.random()*3), x: 520, color: ['#f00','#0f0','#00f','#ff0'][Math.floor(Math.random()*4)] });
+        function spawnShirtTarget() {
+            if (Math.random() < 0.45) {
+                shirts.push({ lane: Math.floor(Math.random()*3), x: 520, hit: false });
             }
         }
 
         function drawBackground() {
-            ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,520,520);
-            ctx.fillStyle = '#222'; ctx.fillRect(0,0,520,380);
-            ctx.fillStyle = '#333'; ctx.fillRect(0,380,520,140);
+            ctx.fillStyle = '#0a0a1f'; ctx.fillRect(0,0,520,520);
+            ctx.fillStyle = '#1a2a1a'; ctx.fillRect(0,320,520,200); // grass/road
             
-            const scroll = (Date.now() / 5) % 80;
-            ctx.strokeStyle = '#555'; ctx.lineWidth = 10;
+            const scroll = (Date.now() / 5) % 100;
+            ctx.strokeStyle = '#0a0'; ctx.lineWidth = 6;
             for (let i = -100; i < 700; i += 70) {
                 ctx.beginPath();
-                ctx.moveTo(i + scroll, 410);
-                ctx.lineTo(i + scroll + 55, 410);
+                ctx.moveTo(i + scroll, 380);
+                ctx.lineTo(i + scroll + 80, 380);
                 ctx.stroke();
             }
         }
 
         function drawPlayer() {
             const x = LANES[player.lane];
-            const y = 340 + player.y;
-            const bob = player.jumping ? 0 : Math.sin(Date.now()/80) * 4;
-            
-            ctx.shadowBlur = 25; ctx.shadowColor = '#ff0';
-            
-            // Legs
-            ctx.fillStyle = '#28a';
-            ctx.fillRect(x-16, y-18 + bob, 10, 38);
-            ctx.fillRect(x+6, y-18 + bob, 10, 38);
-            
-            // Body
-            ctx.fillRect(x-22, y-55, 44, 42);
-            
-            // Head
-            ctx.fillStyle = '#fdb';
-            ctx.beginPath(); ctx.arc(x, y-68, 17, 0, Math.PI*2); ctx.fill();
-            
-            // Hat
-            ctx.fillStyle = '#f00';
-            ctx.fillRect(x-19, y-82, 38, 14);
+            const y = 360 + player.y;
+            ctx.shadowBlur = 20; ctx.shadowColor = '#0ff';
+            ctx.fillStyle = '#28a'; ctx.fillRect(x-22, y-45, 44, 50); // body
+            ctx.fillStyle = '#fdb'; ctx.beginPath(); ctx.arc(x, y-55, 16, 0, Math.PI*2); ctx.fill(); // head
+            ctx.fillStyle = '#f00'; ctx.fillRect(x-18, y-68, 36, 12); // cap
         }
 
         function drawObstacles() {
+            ctx.shadowBlur = 15; ctx.shadowColor = '#f44';
             obstacles.forEach(o => {
-                const x = o.x;
-                if (o.type === 'box') {
-                    ctx.fillStyle = '#842'; ctx.fillRect(x-28, 355, 56, 55);
-                    ctx.fillStyle = '#ff0'; ctx.fillRect(x-25, 360, 50, 8);
-                } else {
-                    ctx.fillStyle = '#555'; ctx.fillRect(x-32, 320, 64, 90);
-                    ctx.fillStyle = '#f00'; ctx.fillRect(x-25, 335, 50, 18);
-                }
+                ctx.fillStyle = '#842';
+                ctx.fillRect(o.x-25, 355, 50, 55);
             });
         }
 
-        function drawShirts() {
+        function drawShirtTargets() {
             shirts.forEach(s => {
-                if (s.collected) return;
+                if (s.hit) return;
                 const x = s.x;
-                ctx.fillStyle = s.color;
-                ctx.fillRect(x-18, 255, 36, 32);
+                ctx.fillStyle = '#ff0';
+                ctx.fillRect(x-18, 260, 36, 32);
                 ctx.fillStyle = '#fff';
-                ctx.fillRect(x-18, 255, 36, 10);
+                ctx.fillRect(x-18, 260, 36, 9);
             });
         }
 
         function update() {
             if (!gameRunning || paused) return;
 
-            if (distance > 700) speed = 7.6;
-            if (distance > 1600) speed = 9.2;
-            if (distance > 2600) speed = 11;
-
             distance += speed / 4;
             scoreEl.textContent = Math.floor(distance) + 'm';
+
+            if (distance > 800) speed = 8.5;
+            if (distance > 2000) speed = 10.5;
 
             obstacles.forEach(o => o.x -= speed);
             shirts.forEach(s => s.x -= speed);
 
-            obstacles = obstacles.filter(o => o.x > -80);
-            shirts = shirts.filter(s => s.x > -50);
+            obstacles = obstacles.filter(o => o.x > -60);
+            shirts = shirts.filter(s => s.x > -60);
 
-            if (player.jumping) {
-                player.vy += 0.9;
-                player.y += player.vy;
-                if (player.y >= 0) { player.y = 0; player.jumping = false; player.vy = 0; }
+            if (player.y < 0) {
+                player.y += 4;
+                if (player.y > 0) player.y = 0;
             }
 
-            if (Math.random() < 0.08) spawnObstacle();
-            if (Math.random() < 0.55) spawnShirt();
+            if (Math.random() < 0.085) spawnObstacle();
+            if (Math.random() < 0.5) spawnShirtTarget();
 
             const px = LANES[player.lane];
             obstacles.forEach(o => {
-                if (o.x < px + 32 && o.x + 50 > px - 32 && player.y > -35) {
-                    playSound('crash');
-                    gameOver();
+                if (o.x < px + 30 && o.x + 40 > px - 30) gameOver();
+            });
+
+            shirts.forEach((s, i) => {
+                if (!s.hit && s.x < px + 35 && s.x + 30 > px - 35) {
+                    s.hit = true;
+                    delivered++;
+                    createParticles(s.x, 270, '#ff0');
                 }
             });
 
-            shirts.forEach(s => {
-                if (!s.collected && s.x < px + 32 && s.x + 25 > px - 32 && Math.abs(player.y) < 55) {
-                    s.collected = true;
-                    createLightBurst(s.x, 265, s.color);
-                    playSound('collect');
-                    distance += 32;
-                }
-            });
-
-            // Light particles update
             for (let i = particles.length-1; i >= 0; i--) {
-                particles[i].update();
-                if (particles[i].life <= 0) particles.splice(i,1);
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.vy += 0.35; p.life--;
+                if (p.life <= 0) particles.splice(i,1);
             }
 
             draw();
@@ -308,9 +222,14 @@
             ctx.clearRect(0, 0, 520, 520);
             drawBackground();
             drawObstacles();
-            drawShirts();
+            drawShirtTargets();
             drawPlayer();
-            particles.forEach(p => p.draw());
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life / 28;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 6, 6);
+            });
+            ctx.globalAlpha = 1;
         }
 
         function gameOver() {
@@ -318,18 +237,17 @@
             clearInterval(gameInterval);
             if (distance > highScore) {
                 highScore = Math.floor(distance);
-                localStorage.setItem('billyShirtsHigh', highScore);
+                localStorage.setItem('billyDeliveryHigh', highScore);
                 highEl.textContent = `HI ${highScore}m`;
             }
-            title.textContent = "FACTORY SHUTDOWN";
-            subtitle.innerHTML = `You folded <b>${Math.floor(distance)}m</b>!`;
+            title.textContent = "DELIVERY FAILED";
+            subtitle.innerHTML = `Delivered <b>${delivered}</b> shirts • ${Math.floor(distance)}m`;
             overlay.style.display = 'flex';
         }
 
         function startGame() {
-            initAudio();
             overlay.style.display = 'none';
-            distance = 0; speed = 6.5;
+            distance = 0; speed = 6.8; delivered = 0;
             obstacles = []; shirts = []; particles = [];
             player = { lane: 1, y: 0, vy: 0, jumping: false };
             scoreEl.textContent = '0m';
@@ -360,8 +278,7 @@
                 case 'ArrowUp':
                     if (!player.jumping) {
                         player.jumping = true;
-                        player.vy = -19;
-                        playSound('jump');
+                        player.y = -65;
                     }
                     break;
                 case ' ': togglePause(); break;
