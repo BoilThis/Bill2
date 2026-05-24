@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
-  <title>HeadTilt Balance 👓 v4.4 - Natural Controls</title>
+  <title>HandyMan Tilt 👷‍♂️</title>
   <style>
     body {
       margin: 0; padding: 0; width: 600px; height: 600px;
@@ -44,65 +44,138 @@
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-    let ball = { x: 300, y: 150, radius: 18, vx: 0, vy: 0 };
+    let player = { x: 300, y: 150, vx: 0, vy: 0, size: 22 };
     let score = 0, gameOver = false;
     let targets = [];
     let tiltX = 0, tiltY = 0;
 
     // Calibration
-    let offsetBeta = 0;
-    let offsetGamma = 0;
-    let isCalibrating = false;
-    let calibrationSamples = [];
-    let isCalibrated = false;
+    let offsetBeta = 0, offsetGamma = 0;
+    let isCalibrating = false, calibrationSamples = [], isCalibrated = false;
 
     function generateTargets() {
       targets = [];
-      for (let i = 0; i < 8; i++) {
-        targets.push({ x: 80 + Math.random() * 440, y: 80 + Math.random() * 440, r: 12 });
+      const tools = ['🔧','🔨','🪛','💡','📏','🛠️'];
+      for (let i = 0; i < 9; i++) {
+        targets.push({ 
+          x: 80 + Math.random() * 440, 
+          y: 80 + Math.random() * 440, 
+          r: 14,
+          type: tools[i % tools.length]
+        });
       }
+    }
+
+    function drawHandyman(x, y) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Shadow
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = '#0f0';
+
+      // Body (overalls)
+      ctx.fillStyle = '#2244ff';
+      ctx.fillRect(-12, 8, 24, 28);
+
+      // Head
+      ctx.fillStyle = '#ffddaa';
+      ctx.beginPath();
+      ctx.arc(0, 0, 13, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hard hat
+      ctx.fillStyle = '#ff8800';
+      ctx.beginPath();
+      ctx.ellipse(0, -8, 15, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eyes
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(-5, -2, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(5, -2, 3, 0, Math.PI * 2); ctx.fill();
+
+      // Smile
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 4, 6, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      // Arms + Tool (Hammer)
+      ctx.strokeStyle = '#ffddaa';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(-12, 12); ctx.lineTo(-22, 22); // left arm
+      ctx.moveTo(12, 12); ctx.lineTo(25, 8);    // right arm
+      ctx.stroke();
+
+      // Hammer head
+      ctx.fillStyle = '#888';
+      ctx.fillRect(25, 4, 10, 8);
+      ctx.fillStyle = '#555';
+      ctx.fillRect(28, -6, 4, 22);
+
+      ctx.restore();
+    }
+
+    function drawToolTarget(t) {
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.font = '28px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff0';
+      ctx.fillText(t.type, 0, 0);
+      ctx.restore();
     }
 
     function draw() {
       ctx.clearRect(0, 0, 600, 600);
+
+      // Workshop background walls
       ctx.fillStyle = '#0ff';
-      ctx.fillRect(0, 0, 600, 40); ctx.fillRect(0, 560, 600, 40);
-      ctx.fillRect(0, 0, 40, 600); ctx.fillRect(560, 0, 40, 600);
-      ctx.fillRect(150, 150, 300, 20); ctx.fillRect(150, 300, 20, 200);
+      ctx.fillRect(0, 0, 600, 40);
+      ctx.fillRect(0, 560, 600, 40);
+      ctx.fillRect(0, 0, 40, 600);
+      ctx.fillRect(560, 0, 40, 600);
+
+      // Inner workshop shelves / obstacles
+      ctx.fillRect(150, 150, 300, 20);
+      ctx.fillRect(150, 300, 20, 200);
       ctx.fillRect(430, 250, 20, 200);
 
-      ctx.fillStyle = '#f0f';
-      targets.forEach(t => { ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI*2); ctx.fill(); });
+      // Draw targets (tools)
+      targets.forEach(t => drawToolTarget(t));
 
-      ctx.fillStyle = '#0f0';
-      ctx.shadowBlur = 30; ctx.shadowColor = '#0f0';
-      ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2); ctx.fill();
-      ctx.shadowBlur = 0;
+      // Draw HandyMan
+      drawHandyman(player.x, player.y);
     }
 
     function update() {
       if (gameOver || !isCalibrated) return;
 
-      ball.vx += tiltX * 0.5;
-      ball.vy += tiltY * 0.75;
+      player.vx += tiltX * 0.5;
+      player.vy += tiltY * 0.75;
 
-      ball.vx *= 0.88;
-      ball.vy *= 0.88;
+      player.vx *= 0.88;
+      player.vy *= 0.88;
 
-      ball.x += ball.vx;
-      ball.y += ball.vy;
+      player.x += player.vx;
+      player.y += player.vy;
 
       // Boundaries
-      if (ball.x < 55) { ball.x = 55; ball.vx *= -0.6; }
-      if (ball.x > 545) { ball.x = 545; ball.vx *= -0.6; }
-      if (ball.y < 55) { ball.y = 55; ball.vy *= -0.6; }
-      if (ball.y > 545) { ball.y = 545; ball.vy *= -0.6; }
+      if (player.x < 55) { player.x = 55; player.vx *= -0.6; }
+      if (player.x > 545) { player.x = 545; player.vx *= -0.6; }
+      if (player.y < 55) { player.y = 55; player.vy *= -0.6; }
+      if (player.y > 545) { player.y = 545; player.vy *= -0.6; }
 
-      // Collect targets
+      // Collect tools
       for (let i = targets.length-1; i >= 0; i--) {
         const t = targets[i];
-        const d = Math.hypot(ball.x - t.x, ball.y - t.y);
-        if (d < ball.radius + t.r) {
+        const d = Math.hypot(player.x - t.x, player.y - t.y);
+        if (d < player.size + t.r) {
           targets.splice(i, 1);
           score += 100;
           document.getElementById('score').textContent = `Score: ${score}`;
@@ -111,7 +184,7 @@
 
       if (targets.length === 0) {
         gameOver = true;
-        document.getElementById('status').textContent = "🎉 YOU WIN!";
+        document.getElementById('status').textContent = "🎉 Workshop Complete! Great job HandyMan!";
       }
       draw();
     }
@@ -120,12 +193,11 @@
       const rawBeta = e.beta || 0;
       const rawGamma = e.gamma || 0;
 
-      // Natural directions (original behavior)
-      tiltX = (rawGamma - offsetGamma) / 60;   // Left/Right natural
-      tiltY = (rawBeta - offsetBeta) / 55;     // Up/Down natural
+      tiltX = (rawGamma - offsetGamma) / 60;
+      tiltY = (rawBeta - offsetBeta) / 55;
 
       document.getElementById('debug').innerHTML = 
-        `Beta (up/down): ${rawBeta.toFixed(1)}° | Gamma (left/right): ${rawGamma.toFixed(1)}°<br>` +
+        `Beta: ${rawBeta.toFixed(1)}° | Gamma: ${rawGamma.toFixed(1)}°<br>` +
         `Offset β: ${offsetBeta.toFixed(1)} | γ: ${offsetGamma.toFixed(1)}<br>` +
         `Calibrated: ${isCalibrated ? 'Yes ✓' : 'No'}`;
     }
@@ -147,29 +219,23 @@
         isCalibrating = false;
         if (calibrationSamples.length > 5) {
           let sumBeta = 0, sumGamma = 0;
-          calibrationSamples.forEach(s => {
-            sumBeta += s.beta;
-            sumGamma += s.gamma;
-          });
+          calibrationSamples.forEach(s => { sumBeta += s.beta; sumGamma += s.gamma; });
           offsetBeta = sumBeta / calibrationSamples.length;
           offsetGamma = sumGamma / calibrationSamples.length;
           isCalibrated = true;
         }
-        document.getElementById('status').textContent = "✅ Calibrated! Tilt your head to play";
-        document.getElementById('mainBtn').textContent = "Restart Game";
+        document.getElementById('status').textContent = "✅ Ready to fix the workshop!";
+        document.getElementById('mainBtn').textContent = "Restart Job";
         document.getElementById('mainBtn').onclick = resetGame;
       }, 3200);
     }
 
     function collectCalibrationSample(e) {
-      if (isCalibrating) {
-        calibrationSamples.push({ beta: e.beta || 0, gamma: e.gamma || 0 });
-      }
+      if (isCalibrating) calibrationSamples.push({ beta: e.beta || 0, gamma: e.gamma || 0 });
     }
 
     async function enableSensors() {
       document.getElementById('status').textContent = "Requesting permissions...";
-
       if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
         try { await DeviceOrientationEvent.requestPermission(); } catch(e) {}
       }
@@ -185,11 +251,11 @@
     }
 
     function resetGame() {
-      ball.x = 300; ball.y = 150; ball.vx = ball.vy = 0;
+      player.x = 300; player.y = 150; player.vx = player.vy = 0;
       score = 0; gameOver = false;
       document.getElementById('score').textContent = 'Score: 0';
       generateTargets();
-      document.getElementById('status').textContent = "Tilt head to move the ball";
+      document.getElementById('status').textContent = "Collect all the tools!";
     }
 
     window.onload = () => {
