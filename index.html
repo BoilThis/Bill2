@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=600, initial-scale=1.0, user-scalable=no">
-  <title>HeadTilt Balance 👓 v4.2 - Both Axes Inverted</title>
+  <title>HeadTilt Balance 👓 v4.4 - Natural Controls</title>
   <style>
     body {
       margin: 0; padding: 0; width: 600px; height: 600px;
@@ -120,12 +120,12 @@
       const rawBeta = e.beta || 0;
       const rawGamma = e.gamma || 0;
 
-      // Both axes inverted as requested
-      tiltX = - (rawGamma - offsetGamma) / 60;   // ← LEFT/RIGHT swapped
-      tiltY = - (rawBeta - offsetBeta) / 55;     // ← UP/DOWN swapped
+      // Natural directions (original behavior)
+      tiltX = (rawGamma - offsetGamma) / 60;   // Left/Right natural
+      tiltY = (rawBeta - offsetBeta) / 55;     // Up/Down natural
 
       document.getElementById('debug').innerHTML = 
-        `Beta: ${rawBeta.toFixed(1)}° | Gamma: ${rawGamma.toFixed(1)}°<br>` +
+        `Beta (up/down): ${rawBeta.toFixed(1)}° | Gamma (left/right): ${rawGamma.toFixed(1)}°<br>` +
         `Offset β: ${offsetBeta.toFixed(1)} | γ: ${offsetGamma.toFixed(1)}<br>` +
         `Calibrated: ${isCalibrated ? 'Yes ✓' : 'No'}`;
     }
@@ -133,7 +133,7 @@
     function handleMotion(e) {
       if (e.rotationRate && isCalibrated) {
         const pitchRate = e.rotationRate.beta || 0;
-        if (Math.abs(pitchRate) > 1.5) tiltY += -pitchRate * 0.01;  // inverted
+        if (Math.abs(pitchRate) > 1.5) tiltY += pitchRate * 0.01;
       }
     }
 
